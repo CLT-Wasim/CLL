@@ -3,6 +3,7 @@
 //! Invoked as `cargo xtask <command>`. Zero third-party dependencies by design
 //! (AGENTS.md section 3: compiler tooling dependencies stay minimal and pinned).
 
+mod conformance_run;
 mod policy;
 
 use std::path::PathBuf;
@@ -21,11 +22,19 @@ COMMANDS:
           2. every conformance test declares a SPEC rule id and an expectation
           3. every error code in docs/errors/ is cited by at least one test
 
+    test [--allow-unimplemented]
+        Run the conformance suite in tests/conformance/ and report each test as
+        passed, failed, or not implemented. Without --allow-unimplemented, a test
+        that cannot be evaluated yet is treated as a failure, because a suite that
+        passes by doing nothing is worse than no suite (AGENTS.md section 9).
+
     help
         Print this message.
 
 OPTIONS:
-    --root <DIR>   Repository root to check (default: current directory)
+    --root <DIR>              Repository root to check (default: current directory)
+    --allow-unimplemented     `test` only: do not fail on tests that need a stage
+                              the compiler does not have yet
 
 EXIT STATUS:
     0  all checks passed
@@ -37,6 +46,7 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut command: Option<String> = None;
     let mut root: PathBuf = PathBuf::from(".");
+    let mut allow_unimplemented = false;
     let mut index = 0;
 
     while let Some(arg) = args.get(index) {
@@ -48,6 +58,10 @@ fn main() -> ExitCode {
                 };
                 root = PathBuf::from(value);
                 index += 2;
+            }
+            "--allow-unimplemented" => {
+                allow_unimplemented = true;
+                index += 1;
             }
             "-h" | "--help" => {
                 println!("{USAGE}");
@@ -70,6 +84,7 @@ fn main() -> ExitCode {
 
     match command.as_deref() {
         Some("policy") => run_policy(&root),
+        Some("test") => run_conformance(&root, allow_unimplemented),
         Some("help") => {
             println!("{USAGE}");
             ExitCode::SUCCESS
@@ -108,6 +123,23 @@ fn run_policy(root: &std::path::Path) -> ExitCode {
                      (AGENTS.md section 7).",
                     report.violations.len()
                 );
+                ExitCode::FAILURE
+            }
+        }
+    }
+}
+
+fn run_conformance(root: &std::path::Path, allow_unimplemented: bool) -> ExitCode {
+    match conformance_run::run(root) {
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::from(2)
+        }
+        Ok(summary) => {
+            print!("{}", summary.report());
+            if summary.is_success(allow_unimplemented) {
+                ExitCode::SUCCESS
+            } else {
                 ExitCode::FAILURE
             }
         }

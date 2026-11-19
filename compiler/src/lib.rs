@@ -23,4 +23,6 @@
 
 #![forbid(unsafe_code)]
 
+pub mod conformance;
+pub mod lexer;
 pub mod revtable;

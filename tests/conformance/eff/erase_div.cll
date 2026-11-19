@@ -1,4 +1,11 @@
 #@ rule: R-EFF-010
-#@ expect: run-ok
-# `/` carries `erase`; an ordinary fn may use it.
-fn main(caps: Caps) -> ExitCode { ExitCode::Success }
+#@ expect: compile-ok
+# Division is lossy, so it may not appear in a `rev fn` (R-REV-070) but is fine here.
+fn half(x: u32) -> u32 {
+    x / 2
+}
+
+fn main(caps: Caps) -> ExitCode {
+    let _ = half(9)
+    ExitCode::Success
+}

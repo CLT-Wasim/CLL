@@ -1,4 +1,6 @@
 #@ rule: R-LEX-002
 #@ expect: compile-error E0001
 # A carriage return is an error, not whitespace.
-fn main(caps: Caps) -> ExitCode { ExitCode::Success }
+fn main(caps: Caps) -> ExitCode {
+    ExitCode::Success
+}
