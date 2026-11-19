@@ -173,4 +173,3 @@ No inheritance, no exceptions, no null, no garbage collector, no macros, no user
 ## Contributing
 
 Read the three files at the top, then follow `AGENTS.md`. All changes go through pull requests, and `main` is protected.
-test
