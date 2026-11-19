@@ -1,0 +1,72 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  # AGENTS.md section 8.1 and 8.2: formatting, lints, unit tests, policy.
+  rust:
+    name: rust / fmt + clippy + test + policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt,clippy
+          rustup default stable
+          rustc --version
+          cargo --version
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}
+
+      - name: cargo fmt --check
+        run: cargo fmt --all --check
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: cargo test
+        run: cargo test --workspace
+
+      # M0 exit criterion (ROADMAP.md): a foreign-language file under a CLL-only
+      # directory must fail the build. This step is the executable form of that rule.
+      - name: cargo xtask policy
+        run: cargo run --quiet --release -p xtask -- policy
+
+  # DECISIONS [137]: v1 targets Linux x86-64, Linux aarch64, macOS arm64.
+  # M0 only asserts that the workspace builds on the two Linux triples; the
+  # full matrix grows with the backend in M6.
+  build:
+    name: build / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: cargo build
+        run: cargo build --workspace --release

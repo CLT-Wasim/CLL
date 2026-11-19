@@ -1,0 +1,29 @@
+# CODEOWNERS: CLL
+#
+# AGENTS.md section 7: directory ownership. A cross-ownership change needs an RFC
+# in rfcs/NNNN-title.md before the PR.
+#
+# The owner is the sole decider until v1.0 (DECISIONS [110]).
+
+*                                   @CLT-Wasim
+
+# The binding rules themselves. Changing these is a governance act, not a code change.
+/AGENTS.md                          @CLT-Wasim
+/DECISIONS.md                       @CLT-Wasim
+/ROADMAP.md                         @CLT-Wasim
+/.github/                           @CLT-Wasim
+
+# The specification is the contract every other directory is checked against.
+/docs/                              @CLT-Wasim
+/rfcs/                              @CLT-Wasim
+
+# The compiler and its policy gate.
+/compiler/                          @CLT-Wasim
+/xtask/                             @CLT-Wasim
+
+# Everything written in CLL.
+/examples/                          @CLT-Wasim
+/tests/                             @CLT-Wasim
+/stdlib/                            @CLT-Wasim
+/automation/                        @CLT-Wasim
+/bench/                             @CLT-Wasim
