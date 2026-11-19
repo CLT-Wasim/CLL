@@ -1,0 +1,7 @@
+#@ rule: R-EXP-020
+#@ expect: compile-error E0140
+# Trap 3: trapping `+` is partial; only `+%` is total.
+
+rev fn bad(inout a: u32, inout b: u32) {
+    a += b
+}

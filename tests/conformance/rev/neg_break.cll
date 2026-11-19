@@ -1,0 +1,10 @@
+#@ rule: R-REV-042
+#@ expect: compile-error E0150
+# An early exit makes the iteration count state-dependent.
+
+rev fn bad(inout a: u32) {
+    for i in 0..3 {
+        if a == 0 { break }
+        a -%= 1
+    }
+}

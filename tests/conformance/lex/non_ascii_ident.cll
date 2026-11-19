@@ -1,0 +1,4 @@
+#@ rule: R-LEX-004
+#@ expect: compile-error E0002
+# Non-ASCII identifiers invite homoglyph attacks.
+fn main(caps: Caps) -> ExitCode { ExitCode::Success }

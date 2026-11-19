@@ -1,0 +1,7 @@
+#@ rule: R-REV-026
+#@ expect: compile-error E0145
+# `swap(a, a)` is the identity, so it has no defined inverse.
+
+rev fn bad(inout a: u32) {
+    swap(a, a)
+}

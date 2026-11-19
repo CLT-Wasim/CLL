@@ -1,0 +1,10 @@
+#@ rule: R-REV-070
+#@ expect: compile-error E0140
+# Trap 6: `match` is excluded from `rev fn` in v1.
+
+rev fn bad(inout a: u32) {
+    match a {
+        0 => { a +%= 1 }
+        _ => { a +%= 2 }
+    }
+}

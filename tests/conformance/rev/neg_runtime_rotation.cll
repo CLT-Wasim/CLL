@@ -1,0 +1,7 @@
+#@ rule: R-REV-023
+#@ expect: compile-error E0142
+# A runtime rotation amount has no syntactic inverse.
+
+rev fn bad(inout a: u32, inout k: u32) {
+    rotl(a, k)
+}

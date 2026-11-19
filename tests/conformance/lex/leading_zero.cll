@@ -1,0 +1,4 @@
+#@ rule: R-LEX-005
+#@ expect: compile-error E0003
+# `0123` is the C octal trap; write `0o123` or `123`.
+fn main(caps: Caps) -> ExitCode { ExitCode::Success }

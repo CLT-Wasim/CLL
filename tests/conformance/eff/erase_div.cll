@@ -1,0 +1,4 @@
+#@ rule: R-EFF-010
+#@ expect: run-ok
+# `/` carries `erase`; an ordinary fn may use it.
+fn main(caps: Caps) -> ExitCode { ExitCode::Success }

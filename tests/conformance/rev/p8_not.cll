@@ -1,0 +1,6 @@
+#@ rule: R-REV-021
+#@ expect: compile-ok
+#@ inverse: mix
+rev fn mix(inout a: u32) {
+    not(a)
+}

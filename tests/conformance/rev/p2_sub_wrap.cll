@@ -1,0 +1,6 @@
+#@ rule: R-REV-020
+#@ expect: compile-ok
+#@ inverse: unmix
+rev fn unmix(inout a: u32, inout b: u32) {
+    a -%= b
+}

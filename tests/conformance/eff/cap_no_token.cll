@@ -1,0 +1,4 @@
+#@ rule: R-CAP-004
+#@ expect: compile-error E0131
+# Reading a file without a `FileRead` token cannot compile.
+fn main(caps: Caps) -> ExitCode { ExitCode::Success }

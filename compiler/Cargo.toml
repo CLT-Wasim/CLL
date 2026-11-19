@@ -1,0 +1,16 @@
+[package]
+name = "cllc"
+description = "The CLL compiler: frontend, checker, and (from M5) the reversible core."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "cllc"
+path = "src/lib.rs"
+
+[dependencies]
+
+[lints]
+workspace = true

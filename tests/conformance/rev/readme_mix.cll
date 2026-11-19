@@ -1,0 +1,18 @@
+#@ rule: R-REV-020
+#@ expect: run-ok
+#@ stdout: 123 456
+# The example from README.md, round-tripped. Reverse order of primitives.
+rev fn mix(inout a: u32, inout b: u32) {
+    a +%= b
+    b ^= a
+    rotl(a, 7)
+}
+
+fn main(caps: Caps) -> ExitCode {
+    mut a: u32 = 123
+    mut b: u32 = 456
+    mix(a, b)
+    reverse mix(a, b)
+    print("{a} {b}")
+    ExitCode::Success
+}
