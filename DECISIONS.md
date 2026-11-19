@@ -211,6 +211,22 @@ Format: decision. *Why.* Changing any entry requires an RFC and an edit here wit
 
 ---
 
+### M1 surface-syntax implementation defaults (review proposal)
+
+The following defaults close omissions found while checking `grammar.ebnf` against the
+v1 decisions. They are written into the v0.2 SPEC draft so implementation can proceed;
+they are **proposals for owner review**, not a claim that M1 sign-off has already happened.
+
+**[155] Generic parameters and arguments** [v1, proposed]: type parameters use `[T: Trait + Other]`; constant parameters use `[const N: usize]`. Type applications accept arguments in declaration order, and the declaration determines whether each argument is a type or a constant expression. V1 bounds name compiler/standard-library traits only; user-defined trait/implementation declarations and dynamic dispatch remain out of scope. *Why:* support the documented `Option[T]`, `Result[T,E]`, and shape-typed `Tensor` without adding runtime dispatch.
+
+**[156] Compile-time expression syntax** [v1, proposed]: `comptime { ... }` evaluates a deterministic, capability-free block before code generation. It uses the existing 10^7-step fuel limit and reports `E0011` on runtime-only input or fuel exhaustion. *Why:* make DECISIONS [19], [36] expressible without macros or unbounded evaluation.
+
+**[157] Saturating compound assignment** [v1, proposed]: `+|=`, `-|=`, and `*|=` do not exist. Saturation is expressed with `+|`, `-|`, `*|` inside an explicit ordinary assignment such as `x = x +| y`; that assignment carries `erase`. *Why:* avoid a second, misleading update-token family in addition to the lossy arithmetic operator.
+
+**[158] Justified unsafe block syntax** [v1, proposed]: `#[justify("reason")] unsafe { ... }`; the non-empty attribute immediately precedes the block. *Why:* make DECISIONS [74] and SPEC R-CAP-030 parseable with one unambiguous placement.
+
+**[159] Documentation-comment priority** [v1, proposed]: `///` is a documentation-comment token recognized before ordinary `#` line comments and attaches to the next module item. No `#///` spelling is introduced. *Why:* preserve DECISIONS [22] and ensure the ordinary-comment token cannot swallow documentation.
+
 ## RISKS (owner's R1-R4, resolved)
 
 **[R1]** Physics gives limits (Landauer, no-cloning, Bekenstein); the language turns limits into compiler rules. Accepted as design principle.

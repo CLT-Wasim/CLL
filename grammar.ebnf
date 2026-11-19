@@ -1,189 +1,149 @@
 (*
-  grammar.ebnf - CLL v1 surface syntax
-  ====================================
+  grammar.ebnf - CLL v1 surface syntax (review draft)
+  ===================================================
 
-  Normative reference: docs/SPEC.md. This file and the SPEC must agree; when they
-  do not, the SPEC wins and this file is the bug.
+  Normative reference: docs/SPEC.md. If this grammar and the SPEC disagree, the SPEC
+  wins and this file is the bug. This draft also makes previously implicit productions
+  explicit; see the v0.2-draft change note in docs/SPEC.md.
 
   Conventions
   -----------
   * ISO/IEC 14977 EBNF: `=` defines, `;` terminates, `|` alternates,
     `[ x ]` optional, `{ x }` zero or more, `( x )` grouping.
-  * Terminals in double quotes are literal tokens. `(* ... *)` is a comment.
-  * Rule names in UPPER_SNAKE are lexical tokens defined in SPEC R-LEX-*.
-  * Every production is annotated with the SPEC rules it implements.
-
-  Resolved grammar questions (see DECISIONS [149]..[154])
-  -------------------------------------------------------
-  * Reversible primitives are STATEMENTS, never expressions (R-REV-022).
-  * `if ... fi` inside a `rev fn` carries a mandatory witness (R-REV-040).
-  * `rev fn` has no return type (R-FN-010).
-  * `local`/`delocal` are statements (R-REV-050).
+  * Quoted terminals are literal tokens. Parenthesized star-delimited comments annotate rules.
+  * A grammar production describes valid syntax only. Lexical/semantic failures such as
+    unknown suffixes, leading-zero integers, type mismatches, and invalid `rev` operations
+    are diagnosed by the lexer or checker as specified in docs/SPEC.md.
+  * Longest-token matching applies. `DOC_COMMENT` and test directives are recognized before
+    ordinary comments. Whitespace and comments are trivia except doc comments, which attach
+    to the next item.
+  * Generic-argument kind (type or constant) is determined from the resolved declaration;
+    the parser preserves an unresolved name where the two forms are textually ambiguous.
 *)
-
 
 (* ---------------------------------------------------------------- module *)
 (* R-MOD-001..004 *)
-
 module          = { use_decl } , { item } ;
 use_decl        = "use" , path , [ "as" , IDENT ] , ";" ;
 path            = IDENT , { "::" , IDENT } ;
 
-
 (* ----------------------------------------------------------------- items *)
 (* R-FN-001..004, R-TYP-008, R-MOD-002 *)
-
-item            = [ "pub" ] , ( fn_decl | rev_fn_decl | struct_decl
-                              | enum_decl | const_decl | type_decl ) ;
-
+item            = { DOC_COMMENT } , [ "pub" ] , item_decl ;
+item_decl       = [ conserving_annotation ] , ( fn_decl | pure_fn_decl )
+                | rev_fn_decl
+                | struct_decl
+                | enum_decl
+                | const_decl
+                | type_decl ;
 fn_decl         = "fn" , IDENT , [ generic_params ] , "(" , [ params ] , ")"
                 , [ "->" , type ] , block ;
-
-rev_fn_decl     = "rev" , "fn" , IDENT , "(" , [ rev_params ] , ")" , block ;
-                (* R-FN-010: no `->` clause is permitted on a `rev fn`. *)
-
 pure_fn_decl    = "pure" , fn_decl ;
-                (* R-FN-001: `pure` is a modifier on an ordinary declaration. *)
-
-generic_params  = "[" , IDENT , { "," , IDENT } , "]" ;
-
+rev_fn_decl     = "rev" , "fn" , IDENT , "(" , [ rev_params ] , ")" , block ;
+                (* R-FN-010: no return-type clause; every parameter is `inout` state. *)
 params          = param , { "," , param } ;
-param           = IDENT , ":" , type ;
-
+param           = [ "inout" ] , IDENT , ":" , type ;
 rev_params      = rev_param , { "," , rev_param } ;
-rev_param       = [ "mut" ] , IDENT , ":" , type ;
-                (* Every `rev fn` parameter is state (R-REV-001). *)
+rev_param       = "inout" , IDENT , ":" , type ;
 
-struct_decl     = "struct" , IDENT , "{" , [ fields ] , "}" ;
+conserving_annotation = "#[" , "conserving" , "]" ;
+justify_annotation    = "#[" , "justify" , "(" , STRING , ")" , "]" ;
+
+(* Type and constant parameters; trait bounds are compiler/std traits in v1. *)
+generic_params  = "[" , generic_param , { "," , generic_param } , "]" ;
+generic_param   = type_param | const_param ;
+type_param      = IDENT , [ ":" , trait_bound ] ;
+const_param     = "const" , IDENT , ":" , unsigned_integer_type ;
+trait_bound     = path , { "+" , path } ;
+
+struct_decl     = "struct" , IDENT , [ generic_params ] , "{" , [ fields ] , "}" ;
 fields          = field , { "," , field } , [ "," ] ;
 field           = IDENT , ":" , type ;
-
-enum_decl       = "enum" , IDENT , "{" , variant , { "," , variant } , [ "," ] , "}" ;
+enum_decl       = "enum" , IDENT , [ generic_params ] , "{" , variant , { "," , variant } , [ "," ] , "}" ;
 variant         = IDENT , [ "(" , type , { "," , type } , ")" ] ;
-
 const_decl      = "const" , IDENT , ":" , type , "=" , expr , ";" ;
-type_decl       = "type" , IDENT , "=" , type , ";" ;
-
-annotation      = "#[" , IDENT , [ "(" , STRING , ")" ] , "]" ;
-                (* R-CAP-030 `#[justify("...")]`, R-EFF-012 `#[conserving]`. *)
-
+type_decl       = "type" , IDENT , [ generic_params ] , "=" , type , ";" ;
 
 (* ----------------------------------------------------------------- types *)
-(* R-TYP-001..032 *)
-
+(* R-TYP-001..034 *)
 type            = primitive_type
                 | fixed_type
+                | tensor_type
                 | array_type
                 | slice_type
+                | capability_type
                 | generic_type
                 | "secret" , "[" , type , "]"
                 | "(" , ")"
                 | path ;
-
-primitive_type  = "i8" | "i16" | "i32" | "i64" | "i128"
-                | "u8" | "u16" | "u32" | "u64" | "u128" | "usize"
-                | "f16" | "bf16" | "f32" | "f64" | "fp8" | "i4"
-                | "bool" | "str" ;
-
+primitive_type  = integer_type | float_type | "bool" | "str" ;
+integer_type    = "i8" | "i16" | "i32" | "i64" | "i128"
+                | "u8" | "u16" | "u32" | "u64" | "u128" | "usize" ;
+unsigned_integer_type = "u8" | "u16" | "u32" | "u64" | "u128" | "usize" ;
+float_type      = "f16" | "bf16" | "f32" | "f64" | "fp8" | "i4" ;
 fixed_type      = ( "fx" | "ufx" ) , "[" , const_expr , "," , const_expr , "]" ;
-                (* R-TYP-004: 1 <= I, 1 <= F, I + F <= 128. *)
-
 array_type      = "[" , type , ";" , const_expr , "]" ;
 slice_type      = "[" , type , "]" ;
-
-generic_type    = path , "[" , type , { "," , const_expr } , "]" ;
-                (* R-TYP-030: `Tensor[f32, 784, 128]` - first argument is the
-                   element type, the rest are const-generic dimensions. *)
-
-const_expr      = const_atom , { ( "+" | "*" ) , const_atom } ;
-                (* R-TYP-031: literals, `+`, `*` only. *)
+tensor_type     = "Tensor" , "[" , type , "," , const_expr , { "," , const_expr } , "]" ;
+                (* R-TYP-030: one element type followed by one or more dimensions. *)
+generic_type    = path , "[" , generic_arguments , "]" ;
+generic_arguments = generic_argument , { "," , generic_argument } ;
+generic_argument  = type | const_expr ;
+                (* The declaration determines argument kinds (R-TYP-034). *)
+capability_type = ( "FileRead" | "FileWrite" | "Net" ) , "(" , STRING , ")"
+                | "Clock" | "Rng" | "Proc" | "Ffi" ;
+const_expr      = const_sum ;
+const_sum       = const_product , { "+" , const_product } ;
+const_product   = const_atom , { "*" , const_atom } ;
 const_atom      = INT_LITERAL | const_expr_ref | "(" , const_expr , ")" ;
 const_expr_ref  = IDENT | path ;
 
-
 (* ---------------------------------------------------------------- blocks *)
 (* R-EXP-001 *)
-
 block           = "{" , { statement } , [ expr ] , "}" ;
 
-
 (* ------------------------------------------------------------ statements *)
-
 statement       = let_stmt
                 | assign_stmt
                 | expr_stmt
-                | if_stmt
                 | rev_if_stmt
-                | for_stmt
-                | match_stmt
+                | for_expr
                 | return_stmt
                 | rev_stmt
                 | local_stmt
                 | delocal_stmt
                 | discard_stmt
+                | unsafe_stmt
+                | rev_primitive
                 | "break" , ";"
                 | "continue" , ";"
                 | ";" ;
-
 let_stmt        = "let" , [ "mut" ] , IDENT , [ ":" , type ] , "=" , expr , ";" ;
-
 assign_stmt     = place , assign_op , expr , ";" ;
 assign_op       = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "^=" | "&=" | "|="
-                | "<<=" | ">>=" | "+%=" | "-%=" | "*%=" | "+|" , "=" | "-|" , "=" | "*|" , "=" ;
-                (* R-EXP-020: `+%=` etc. are single tokens (R-LEX-011). *)
-
+                | "<<=" | ">>=" | "+%=" | "-%=" | "*%=" ;
+                (* No saturating compound assignments in v1 (R-LEX-011). *)
 expr_stmt       = expr , ";" ;
-
-if_stmt         = "if" , expr , block , [ "else" , ( block | if_stmt ) ] ;
-                (* An ordinary conditional. Irreversible, so not allowed in `rev fn`. *)
-
 rev_if_stmt     = "if" , expr , block , "else" , block , "fi" , expr , ";" ;
-                (* R-REV-040: the `fi` witness is mandatory and must be a place
-                   that was false before the statement (DECISIONS [149]). *)
-
-for_stmt        = "for" , IDENT , "in" , expr , ".." , expr , block ;
-                (* R-EXP-070: half-open range only. *)
-
-match_stmt      = "match" , expr , "{" , match_arm , { "," , match_arm } , [ "," ] , "}" ;
-match_arm       = pattern , [ "if" , expr ] , "=>" , ( block | expr ) ;
-pattern         = "_"
-                | IDENT
-                | path , [ "(" , pattern , { "," , pattern } , ")" ]
-                | literal_pattern ;
-literal_pattern = INT_LITERAL | FLOAT_LITERAL | STRING | "true" | "false" ;
-
+                (* R-REV-040: witness is checked semantically and must start false. *)
+for_expr        = "for" , IDENT , "in" , expr , ".." , expr , block ;
+                (* R-EXP-070; has type `()` and is not allowed to escape as a value. *)
 return_stmt     = "return" , [ expr ] , ";" ;
-
-rev_stmt        = "reverse" , ( IDENT , "(" , [ arg_list ] , ")" | block ) ;
-                (* R-FN-001: the inverse operator. `reverse f(a, b)` and
-                   `reverse { ... }` (R-121). *)
-
+rev_stmt        = "reverse" , ( path , "(" , [ arg_list ] , ")" , ";" | block , [ ";" ] ) ;
 local_stmt      = "local" , IDENT , "=" , expr , ";" ;
 delocal_stmt    = "delocal" , IDENT , "=" , expr , ";" ;
-                (* R-REV-050: `delocal` asserts equality then removes the place. *)
-
 discard_stmt    = "discard" , "(" , expr , ")" , ";" ;
-                (* R-EXP-080: carries `erase`. *)
-
+unsafe_stmt     = justify_annotation , "unsafe" , block ;
 
 (* --------------------------------------------------- reversible primitives *)
-(* R-REV-020..026: these are STATEMENTS. Using one as an expression is E0141. *)
-
+(* R-REV-020..026: statements, never expressions (E0141). *)
 rev_primitive   = rev_update | rev_swap | rev_rotate | rev_not ;
-
 rev_update      = place , ( "+%=" | "-%=" | "^=" | "*%=" ) , expr , ";" ;
-                (* P1..P4. For `*%=` the right side must be an odd comptime
-                   constant (R-REV-024); for the others it must not read the
-                   target place (R-REV-030). *)
-
 rev_swap        = "swap" , "(" , place , "," , place , ")" , ";" ;
 rev_rotate      = ( "rotl" | "rotr" ) , "(" , place , "," , const_expr , ")" , ";" ;
-                (* R-REV-023: the amount is a comptime constant. *)
 rev_not         = "not" , "(" , place , ")" , ";" ;
 
-
 (* ----------------------------------------------------------- expressions *)
-
 expr            = logic_or ;
 logic_or        = logic_and , { "||" , logic_and } ;
 logic_and       = comparison , { "&&" , comparison } ;
@@ -196,57 +156,72 @@ additive        = multiplicative , { ( "+" | "-" | "+%" | "-%" | "+|" | "-|" ) ,
 multiplicative  = cast , { ( "*" | "/" | "%" | "*%" | "*|" ) , cast } ;
 cast            = unary , { ( "as" | "as_wrapping" ) , type } ;
 unary           = ( "!" | "~" | "-" ) , unary | postfix ;
-                (* R-EXP-011: bitwise binds tighter than comparison, which the
-                   chain above enforces structurally. *)
-
 postfix         = primary , { call_suffix | index_suffix | field_suffix | "?" } ;
 call_suffix     = "(" , [ arg_list ] , ")" ;
 index_suffix    = "[" , expr , "]" ;
 field_suffix    = "." , IDENT ;
-
 primary         = literal
                 | path
                 | "(" , expr , ")"
                 | array_literal
                 | struct_literal
+                | if_expr
+                | match_expr
+                | for_expr
+                | comptime_expr
                 | block ;
-
-literal         = INT_LITERAL | FLOAT_LITERAL | STRING | "true" | "false" ;
+if_expr         = "if" , expr , block , "else" , ( block | if_expr ) ;
+match_expr      = "match" , expr , "{" , match_arm , { "," , match_arm } , [ "," ] , "}" ;
+match_arm       = pattern , [ "if" , expr ] , "=>" , ( block | expr ) ;
+pattern         = "_" | IDENT | path , [ "(" , pattern , { "," , pattern } , ")" ] | literal_pattern ;
+literal_pattern = INT_LITERAL | FLOAT_LITERAL | STRING | "true" | "false" ;
+comptime_expr   = "comptime" , block ;
 array_literal   = "[" , [ expr , { "," , expr } , [ "," ] ] , "]" ;
 struct_literal  = path , "{" , [ field_init , { "," , field_init } , [ "," ] ] , "}" ;
 field_init      = IDENT , ":" , expr ;
-
 arg_list        = expr , { "," , expr } ;
-place           = path | IDENT ;
-                (* A place is assignable and can be passed `inout`. *)
-
+place           = path , { field_suffix | index_suffix } ;
+                (* Inout actual arguments are parsed as expressions, then checked as places. *)
+literal         = INT_LITERAL | FLOAT_LITERAL | STRING | "true" | "false" ;
 
 (* ----------------------------------------------------------------- lexical *)
-
-IDENT           = ( LETTER | "_" ) , { LETTER | DIGIT | "_" } ;
-                (* R-LEX-004: ASCII only. *)
+(* R-LEX-001..012. The lexer uses maximal munch and emits reserved words as distinct tokens. *)
+IDENT           = ID_START , { ID_CONT } ;
+ID_START        = LETTER | "_" ;
+ID_CONT         = LETTER | DIGIT | "_" ;
 LETTER          = "A" | ... | "Z" | "a" | ... | "z" ;
 DIGIT           = "0" | ... | "9" ;
-
-INT_LITERAL     = decimal | hex | binary | octal , [ suffix ] ;
-decimal         = DIGIT , { [ "_" ] , DIGIT } ;
-hex             = "0x" , HEXDIGIT , { [ "_" ] , HEXDIGIT } ;
-binary          = "0b" , ( "0" | "1" ) , { [ "_" ] , ( "0" | "1" ) } ;
-octal           = "0o" , OCTDIGIT , { [ "_" ] , OCTDIGIT } ;
-suffix          = "u8" | "u16" | "u32" | "u64" | "u128" | "usize"
+NONZERO_DIGIT   = "1" | ... | "9" ;
+ANY_UNICODE_SCALAR = ? any Unicode scalar value, excluding surrogate code points ? ;
+ANY_CHAR        = ? any Unicode scalar value except line feed ? ;
+HEXDIGIT        = DIGIT | "A" | ... | "F" | "a" | ... | "f" ;
+OCTDIGIT        = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" ;
+BINDIGIT        = "0" | "1" ;
+DIGITS          = DIGIT , { [ "_" ] , DIGIT } ;
+DECIMAL         = "0" | NONZERO_DIGIT , { [ "_" ] , DIGIT } ;
+HEX             = "0x" , HEXDIGIT , { [ "_" ] , HEXDIGIT } ;
+BINARY          = "0b" , BINDIGIT , { [ "_" ] , BINDIGIT } ;
+OCTAL           = "0o" , OCTDIGIT , { [ "_" ] , OCTDIGIT } ;
+INT_LITERAL     = ( DECIMAL | HEX | BINARY | OCTAL ) , [ integer_suffix ] ;
+integer_suffix  = "u8" | "u16" | "u32" | "u64" | "u128" | "usize"
                 | "i8" | "i16" | "i32" | "i64" | "i128" ;
-
-FLOAT_LITERAL   = DIGIT , { DIGIT | "_" } , ( "." , DIGIT , { DIGIT | "_" } ) ,
-                  [ ( "e" | "E" ) , [ "+" | "-" ] , DIGIT , { DIGIT } ] , [ float_suffix ]
-                | DIGIT , { DIGIT | "_" } , ( "e" | "E" ) , [ "+" | "-" ] , DIGIT , { DIGIT } ,
-                  [ float_suffix ] ;
-                (* R-LEX-006: `1.` and `.5` are errors; a `.` or an exponent is
-                   required. *)
+FLOAT_LITERAL   = DECIMAL , "." , DIGITS , [ exponent ] , [ float_suffix ]
+                | DECIMAL , exponent , [ float_suffix ] ;
+exponent        = ( "e" | "E" ) , [ "+" | "-" ] , DIGITS ;
 float_suffix    = "f16" | "bf16" | "f32" | "f64" ;
-
-STRING          = '"' , { STRING_CHAR | ESCAPE | INTERPOLATION } , '"' ;
+                (* Unknown/wrong-kind suffixes and out-of-range literals are lexical errors. *)
+STRING          = "\"" , { STRING_CHAR | ESCAPE | INTERPOLATION } , "\"" ;
+STRING_CHAR     = ANY_UNICODE_SCALAR - ( "\"" | "\\" | NEWLINE | "\r" ) ;
+ESCAPE          = "\\" , ( "n" | "t" | "r" | "\\" | "\"" | "{" | "}" | UNICODE_ESCAPE ) ;
+UNICODE_ESCAPE  = "u" , "{" , HEXDIGIT , { HEXDIGIT } , "}" ;
 INTERPOLATION   = "{" , expr , "}" ;
-
-COMMENT         = "#" , { ANY_CHAR - NEWLINE } ;
 DOC_COMMENT     = "///" , { ANY_CHAR - NEWLINE } ;
-                (* R-LEX-003: line comments only. *)
+COMMENT         = "#" , { ANY_CHAR - NEWLINE } ;
+TEST_DIRECTIVE  = "#@" , { ANY_CHAR - NEWLINE } ;
+NEWLINE         = "\n" ;
+WHITESPACE      = ( " " | "\t" | NEWLINE ) , { " " | "\t" | NEWLINE } ;
+                (* A lone carriage return is E0001. DOC_COMMENT/TEST_DIRECTIVE precede COMMENT.
+                   Reserved words are the list in R-LEX-010 and are not IDENT tokens.
+                   #@ directives are accepted only in test files; otherwise E0010.
+                   Leading-zero decimal and malformed float spellings are lexical errors.
+                   A doc comment attaches to the next item; ordinary comments are discarded. *)

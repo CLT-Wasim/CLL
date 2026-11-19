@@ -11,7 +11,7 @@ Scope narrows per milestone, quality never does: nothing built here is throwaway
 - `cargo xtask policy` implemented (forbidden-language check, SPEC-reference check).
 - **Exit:** a PR containing a `.py` file under `examples/` fails CI (demonstrated with a real failing run).
 
-## M1: Specification v0.1
+## M1: Specification v0.2-draft
 - `docs/SPEC.md` with rule IDs: lexical, types, mutability/`inout`, effects (`erase`, `inexact`), capabilities, and the **complete `rev fn` chapter**: primitive table (forward/inverse/preconditions), conditional, loops, ancillas, `couple`, determinism domain.
 - `grammar.ebnf` for the v1 syntax; `docs/IR.md` with AST/HIR/MIR definitions; error catalogue skeleton.
 - Red team performs an adversarial read and files at least 10 attack programs against the spec (as drafts of negative tests).
