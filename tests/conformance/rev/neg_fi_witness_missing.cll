@@ -1,0 +1,7 @@
+#@ rule: R-REV-040
+#@ expect: compile-error E0148
+# SPEC gap G1: the `fi` witness is mandatory.
+
+rev fn bad(inout a: u32, inout c: bool) {
+    if c { a +%= 1 } else { a -%= 1 }
+}

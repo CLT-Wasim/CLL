@@ -1,0 +1,7 @@
+#@ rule: R-REV-024
+#@ expect: compile-ok
+#@ inverse: mix
+# An odd comptime multiplier is invertible mod 2^32.
+rev fn mix(inout a: u32) {
+    a *%= 0x0000_0025
+}

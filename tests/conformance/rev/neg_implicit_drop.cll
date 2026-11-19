@@ -1,0 +1,7 @@
+#@ rule: R-REV-051
+#@ expect: compile-error E0034
+# Trap: an implicit drop inside `rev fn` leaks an ancilla.
+
+rev fn bad(inout a: u32) {
+    let t = a +% 1
+}

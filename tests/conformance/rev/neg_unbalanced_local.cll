@@ -1,0 +1,8 @@
+#@ rule: R-REV-052
+#@ expect: compile-error E0153
+# A `local` without `delocal` leaves garbage in the state.
+
+rev fn bad(inout a: u32) {
+    local t = a
+    a +%= 1
+}

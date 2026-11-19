@@ -1,0 +1,7 @@
+#@ rule: R-FN-010
+#@ expect: compile-error E0140
+# A `rev fn` cannot return a value or a `Result`.
+
+rev fn bad(inout a: u32) -> Result[(), ()] {
+    Ok(())
+}

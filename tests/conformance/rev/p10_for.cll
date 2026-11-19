@@ -1,0 +1,9 @@
+#@ rule: R-REV-041
+#@ expect: compile-ok
+#@ inverse: mix
+rev fn mix(inout a: u32, inout b: u32) {
+    for i in 0..3 {
+        a +%= b
+        rotl(a, 1)
+    }
+}

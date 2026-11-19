@@ -1,0 +1,7 @@
+#@ rule: R-REV-022
+#@ expect: compile-error E0141
+# A reversible primitive is a statement, not a value.
+
+rev fn bad(inout a: u32) {
+    let x: u32 = rotl(a, 7)
+}

@@ -1,0 +1,9 @@
+#@ rule: R-REV-041
+#@ expect: compile-error E0149
+# A `while` loop has no fixed inverse length.
+
+rev fn bad(inout a: u32) {
+    while a > 0 {
+        a -%= 1
+    }
+}

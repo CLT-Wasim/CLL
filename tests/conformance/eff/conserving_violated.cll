@@ -1,0 +1,4 @@
+#@ rule: R-EFF-012
+#@ expect: compile-error E0120
+# `#[conserving]` forbids any `erase` operation.
+fn main(caps: Caps) -> ExitCode { ExitCode::Success }

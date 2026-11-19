@@ -1,0 +1,7 @@
+#@ rule: R-REV-061
+#@ expect: compile-error E0140
+# Trap 4: float cannot be reversible state.
+
+rev fn bad(inout a: f32, inout b: f32) {
+    a +%= b
+}

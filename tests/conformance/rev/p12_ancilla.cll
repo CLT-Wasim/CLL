@@ -1,0 +1,10 @@
+#@ rule: R-REV-050
+#@ expect: compile-ok
+#@ inverse: mix
+# An ancilla is introduced with `local`, used, then removed with `delocal`.
+# The delocal value is checked: after `a +%= b`, `a -% b` is the original `a`.
+rev fn mix(inout a: u32, inout b: u32) {
+    local t = a
+    a +%= b
+    delocal t = a -% b
+}

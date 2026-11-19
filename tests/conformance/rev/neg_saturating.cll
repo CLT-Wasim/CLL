@@ -1,0 +1,7 @@
+#@ rule: R-EXP-022
+#@ expect: compile-error E0140
+# Trap 3: saturating `+|` is not injective.
+
+rev fn bad(inout a: u32, inout b: u32) {
+    a +|= b
+}

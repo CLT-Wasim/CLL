@@ -1,0 +1,4 @@
+#@ rule: R-CAP-003
+#@ expect: compile-error E0130
+# Attenuation cannot widen a scope.
+fn main(caps: Caps) -> ExitCode { ExitCode::Success }

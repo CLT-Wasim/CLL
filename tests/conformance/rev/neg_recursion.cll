@@ -1,0 +1,7 @@
+#@ rule: R-REV-070
+#@ expect: compile-error E0140
+# Recursion in `rev fn` is v2 (DECISIONS [119]).
+
+rev fn bad(inout a: u32) {
+    if a > 0 { bad(a) } else { a +%= 1 } fi a > 0
+}

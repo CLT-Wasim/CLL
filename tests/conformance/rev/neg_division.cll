@@ -1,0 +1,7 @@
+#@ rule: R-REV-070
+#@ expect: compile-error E0140
+# Trap 1: `x / 2` is not injective, so it cannot be in a `rev fn`.
+
+rev fn bad(inout x: u32) {
+    x = x / 2
+}

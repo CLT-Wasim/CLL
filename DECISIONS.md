@@ -197,6 +197,18 @@ Format: decision. *Why.* Changing any entry requires an RFC and an edit here wit
 **[147] Source of truth for numbers**: results live in `cll-bench/results/*.md`, each with command, raw output, hardware, commit.
 **[148] Release cadence**: milestone-based, not date-based.
 
+**[149] `fi` witness must start false** [v1, SPEC R-REV-040]. *Why:* AGENTS.md 2.3 requires `c2` to be true after the `then` branch, but if `c2` was already true before the statement the inverse cannot tell which branch ran. The witness must be a bit that was `false` and is now `true`. Missing/trivial witness = `E0148`. **OWNER sign-off pending (M1).**
+
+**[150] Rotation amount is a comptime constant** [v1, SPEC R-REV-023]. *Why:* a runtime `k` would have to be unchanged between forward and reverse for the syntactic inverse to be correct, which the derivation cannot check. Runtime `k` = `E0142`. **OWNER sign-off pending (M1).**
+
+**[151] Reversible primitives are statements, not expressions** [v1, SPEC R-REV-021/022]. *Why:* the state-update model requires every table entry to mutate a place in one step. `not(a)`, `swap(a,b)`, `rotl(a,k)`, `rotr(a,k)` produce no value; using one in value position = `E0141`. **OWNER sign-off pending (M1).**
+
+**[152] `local`/`delocal` exact semantics** [v1, SPEC R-REV-050]. `delocal x = e2` asserts the place equals `e2`, then removes it from the state. The inverse is `local x = e2; reverse S; delocal x = e`. *Why:* without removal the ancilla stays in the state as garbage and memory grows with call depth, defeating the purpose of reversibility. Unbalanced = `E0153`. **OWNER sign-off pending (M1).**
+
+**[153] `rev fn` returns `()`** [v1, SPEC R-FN-010]. Values leave through `inout` state only. *Why:* a returned value would have to be reconstructible by the inverse; state is invertible, a return value is not, and the inverse's signature must equal the forward signature for `reverse f(...)` to type-check. **OWNER sign-off pending (M1).**
+
+**[154] `e`-does-not-read-target is a place-based, transitive check** [v1, SPEC R-REV-030..032]. The check is on places, not names: two `inout` parameters bound to the same place by the caller are the same place; a call whose `inout` argument is the target violates the rule; a `pure fn` cannot alias because it may not take `inout` at all. Rejection on doubt = `E0146`. *Why:* `a +%= a` is `a := 2a`, not injective mod 2^n. False acceptance is P0; false rejection is a checker bug. **OWNER sign-off pending (M1).**
+
 ---
 
 ## RISKS (owner's R1-R4, resolved)

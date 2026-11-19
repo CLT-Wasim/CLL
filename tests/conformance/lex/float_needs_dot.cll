@@ -1,0 +1,4 @@
+#@ rule: R-LEX-006
+#@ expect: compile-error E0004
+# `1.` and `.5` are errors; write `1.0` and `0.5`.
+fn main(caps: Caps) -> ExitCode { ExitCode::Success }
