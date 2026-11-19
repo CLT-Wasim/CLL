@@ -1550,22 +1550,16 @@ mod tests {
             seed
         };
         for _ in 0..20_000 {
-            let len = (next() % 48) as usize;
+            let len = usize::try_from(next() % 48).unwrap_or(0);
             let mut input = String::new();
             for _ in 0..len {
-                let byte = (next() % 256) as u8;
-                // Build valid UTF-8 by taking a char from a bounded alphabet that
-                // still includes multi-byte characters and every delimiter.
-                let ch = match byte % 8 {
-                    0 => char::from(b' ' + (byte % 95)),
-                    1 => char::from(b'0' + (byte % 10)),
-                    2 => '\n',
-                    3 => '\r',
-                    4 => '"',
-                    5 => '#',
-                    6 => 'é',
-                    _ => '𝄞',
-                };
+                // A bounded alphabet that still includes multi-byte characters,
+                // every delimiter the lexer branches on, and both line endings.
+                const ALPHABET: [char; 16] = [
+                    ' ', 'a', 'Z', '_', '0', '7', '+', '%', '=', '"', '#', '\n', '\r', 'é', '𝄞',
+                    '\t',
+                ];
+                let ch = ALPHABET[usize::try_from(next() % 16).unwrap_or(0)];
                 input.push(ch);
             }
             // Either outcome is fine; a panic is not.
