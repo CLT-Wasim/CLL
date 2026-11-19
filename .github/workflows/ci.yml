@@ -52,6 +52,12 @@ jobs:
       - name: cargo xtask policy
         run: cargo run --quiet --release -p xtask -- policy
 
+      # The conformance suite is the contract. Tests that need a compiler stage
+      # that does not exist yet are reported, not silently skipped, so this step
+      # is honest: it fails the moment a test that *can* run starts failing.
+      - name: cargo xtask test
+        run: cargo run --quiet --release -p xtask -- test --allow-unimplemented
+
   # DECISIONS [137]: v1 targets Linux x86-64, Linux aarch64, macOS arm64.
   # M0 only asserts that the workspace builds on the two Linux triples; the
   # full matrix grows with the backend in M6.

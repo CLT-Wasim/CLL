@@ -1,4 +1,7 @@
 #@ rule: R-LEX-007
 #@ expect: compile-error E0005
 # An unknown numeric suffix is rejected at lexing.
-fn main(caps: Caps) -> ExitCode { ExitCode::Success }
+fn main(caps: Caps) -> ExitCode {
+    let x: u32 = 42q
+    ExitCode::Success
+}
