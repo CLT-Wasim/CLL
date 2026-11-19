@@ -42,11 +42,20 @@ every diagnostic needs one (AGENTS.md section 4).
 pub struct Span { pub file: FileId, pub start: u32, pub end: u32 }
 
 pub struct Ast {
+    pub uses: Vec<UseDecl>,
     pub items: Vec<Item>,
 }
 
-pub enum Item {
-    Use(UseDecl),
+pub struct Item {
+    pub docs: Vec<String>,
+    pub visibility: Visibility,
+    pub kind: ItemKind,
+    pub span: Span,
+}
+
+pub enum Visibility { Private, Public }
+
+pub enum ItemKind {
     Fn(FnDecl),
     RevFn(RevFnDecl),
     Struct(StructDecl),
@@ -57,8 +66,8 @@ pub enum Item {
 
 pub struct FnDecl {
     pub name: Ident,
-    pub kind: FnKind,          // Fn | Pure
-    pub generics: Vec<Ident>,
+    pub kind: FnKind,          // Ordinary | Pure
+    pub generics: Vec<GenericParam>,
     pub params: Vec<Param>,
     pub ret: Option<TypeExpr>,
     pub body: Block,
@@ -66,32 +75,58 @@ pub struct FnDecl {
     pub span: Span,
 }
 
-/// SPEC R-FN-010: no return type. The grammar does not accept one.
+/// SPEC R-FN-010: no return-type clause; all parameters are inout state.
 pub struct RevFnDecl {
     pub name: Ident,
-    pub params: Vec<Param>,     // all are state (R-REV-001)
+    pub params: Vec<Param>,     // all have ParamMode::Inout (R-REV-001)
     pub body: Block,
     pub span: Span,
 }
 
+pub enum GenericParam {
+    Type { name: Ident, bounds: Vec<Path> },
+    Const { name: Ident, ty: TypeExpr },
+}
+
+pub enum ParamMode { Value, Inout }
+pub struct Param { pub mode: ParamMode, pub name: Ident, pub ty: TypeExpr, pub span: Span }
+pub enum Annotation { Conserving }
+
+pub struct Block { pub statements: Vec<Stmt>, pub tail: Option<Expr>, pub span: Span }
+
 pub enum Stmt {
     Let(LetStmt),
     Assign(AssignStmt),
-    Expr(Expr),
-    If(IfStmt),                 // ordinary, irreversible
+    Expr(Expr),                 // expression statement; reversible primitives are separate
     RevIf(RevIfStmt),           // `if c {..} else {..} fi c2`  (R-REV-040)
-    For(ForStmt),
-    Match(MatchStmt),
     Return(Option<Expr>),
     Reverse(ReverseStmt),       // `reverse f(..)` / `reverse { .. }`
     Local(LocalStmt),           // R-REV-050
     Delocal(DelocalStmt),       // R-REV-050
     Discard(Expr),
+    Unsafe { justification: String, body: Block },
     Break,
     Continue,
     /// P1..P8 of SPEC R-REV-020. Deliberately a *statement*: see R-REV-022.
     RevPrimitive(RevPrimitive),
 }
+
+pub enum Expr {
+    Literal(Literal), Name(Path), Unary(UnaryOp, Box<Expr>),
+    Binary(BinaryOp, Box<Expr>, Box<Expr>), Cast(Box<Expr>, TypeExpr),
+    Call { callee: Box<Expr>, args: Vec<Expr> }, Index(Box<Expr>, Box<Expr>),
+    Field(Box<Expr>, Ident), Try(Box<Expr>), Array(Vec<Expr>), Struct(StructExpr),
+    If { condition: Box<Expr>, then_block: Block, else_block: Block },
+    Match { value: Box<Expr>, arms: Vec<MatchArm> },
+    For { binding: Ident, start: Box<Expr>, end: Box<Expr>, body: Block },
+    Comptime(Block), Block(Block),
+}
+
+pub enum TypeExpr { Path(Path), Apply(Path, Vec<GenericArg>), Fixed(Box<Expr>, Box<Expr>),
+    Tensor { element: Box<TypeExpr>, dimensions: Vec<ConstExpr> },
+    Array(Box<TypeExpr>, Box<Expr>), Slice(Box<TypeExpr>), Capability(CapabilityType),
+    Secret(Box<TypeExpr>), Unit }
+pub enum GenericArg { Type(TypeExpr), Const(ConstExpr), UnresolvedName(Path) }
 
 pub enum RevPrimitive {
     AddEq  { place: Place, rhs: Expr },
@@ -104,6 +139,12 @@ pub enum RevPrimitive {
     Not    { place: Place },
 }
 ```
+
+`comptime` nodes are evaluated and replaced by constants before HIR lowering. `If`, `Match`,
+and `For` are expressions with the result rules in SPEC R-EXP-002; `For` always has type
+`()`. `RevIf` and reversible primitive nodes remain statements and are never desugared into
+ordinary expressions. `inout` actual arguments are represented as place expressions and are
+validated by name/alias checking, not by the parser.
 
 **Why `RevPrimitive` is a separate statement node and not sugar for
 `Assign(AddEq, ...)`:** because SPEC R-REV-022 says so, and because a distinct node

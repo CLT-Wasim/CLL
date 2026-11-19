@@ -23,6 +23,12 @@ index below is the contract and the pages follow the tests.
 | E0009 | malformed compound assignment | R-LEX-011 |
 | E0010 | test directive in a non-test file | R-LEX-012 |
 
+## Compile-time evaluation (E001x)
+
+| code | meaning | SPEC rule |
+|---|---|---|
+| E0011 | compile-time evaluation depends on runtime data or exceeds its fuel budget | R-EXP-090 |
+
 ## Types and const generics (E002x)
 
 | code | meaning | SPEC rule |

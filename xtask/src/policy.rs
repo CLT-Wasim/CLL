@@ -62,7 +62,7 @@ pub fn check(root: &Path) -> Result<Report, String> {
     }
 
     let mut report = Report::default();
-    let mut cited_rules: BTreeSet<String> = BTreeSet::new();
+    let mut cited_errors: BTreeSet<String> = BTreeSet::new();
 
     report
         .violations
@@ -70,12 +70,12 @@ pub fn check(root: &Path) -> Result<Report, String> {
     report.violations.extend(check_test_headers(
         root,
         &mut report.tests_scanned,
-        &mut cited_rules,
+        &mut cited_errors,
     ));
     report.error_codes = count_error_docs(root);
     report
         .violations
-        .extend(check_error_docs_cited(root, &cited_rules));
+        .extend(check_error_docs_cited(root, &cited_errors));
 
     report
         .violations
@@ -133,7 +133,7 @@ struct Header {
 fn check_test_headers(
     root: &Path,
     tests_scanned: &mut usize,
-    cited_rules: &mut BTreeSet<String>,
+    cited_errors: &mut BTreeSet<String>,
 ) -> Vec<Violation> {
     let mut violations = Vec::new();
     let tests_dir = root.join("tests");
@@ -162,9 +162,7 @@ fn check_test_headers(
         let rel = relative(root, &path);
 
         match &header.rule {
-            Some(rule) => {
-                cited_rules.insert(rule.clone());
-            }
+            Some(_) => {}
             None => violations.push(Violation {
                 rule: "P-TEST",
                 path: rel.clone(),
@@ -184,8 +182,21 @@ fn check_test_headers(
                     .to_owned(),
             });
         }
+
+        for expectation in &header.expectations {
+            if let Some(code) = expected_error_code(expectation) {
+                cited_errors.insert(code.to_owned());
+            }
+        }
     }
     violations
+}
+
+fn expected_error_code(expectation: &str) -> Option<&str> {
+    let rest = expectation.strip_prefix("compile-error ")?;
+    let code = rest.split_whitespace().next()?;
+    let digits = code.strip_prefix('E')?;
+    (digits.len() == 4 && digits.bytes().all(|byte| byte.is_ascii_digit())).then_some(code)
 }
 
 /// Reads `#@ key: value` directives from the top of a test file.
@@ -229,7 +240,7 @@ fn count_error_docs(root: &Path) -> usize {
         .count()
 }
 
-/// P-ERRDOC: every documented error code must be cited by a conformance test.
+/// P-ERRDOC: every documented error code must be named in a conformance expectation.
 fn check_error_docs_cited(root: &Path, cited: &BTreeSet<String>) -> Vec<Violation> {
     let dir = root.join("docs").join("errors");
     if !dir.is_dir() {
@@ -345,6 +356,32 @@ mod tests {
         fs::write(temp.join("stdlib").join("core.cll"), "").unwrap_or_default();
         let mut scanned = 0;
         assert_eq!(check_language_policy(&temp, &mut scanned), []);
+        fs::remove_dir_all(&temp).unwrap_or_default();
+    }
+
+    #[test]
+    fn error_doc_is_satisfied_by_expected_error_code() {
+        let temp = tempdir();
+        let tests = temp.join("tests").join("conformance");
+        let errors = temp.join("docs").join("errors");
+        fs::create_dir_all(&tests).unwrap_or_default();
+        fs::create_dir_all(&errors).unwrap_or_default();
+        fs::write(errors.join("E0011.md"), "# E0011\n").unwrap_or_default();
+        fs::write(
+            tests.join("bad.cll"),
+            "#@ rule: R-EXP-090\n#@ expect: compile-error E0011\nfn bad() {}\n",
+        )
+        .unwrap_or_default();
+
+        let mut scanned = 0;
+        let mut cited_errors = BTreeSet::new();
+        let header_violations = check_test_headers(&temp, &mut scanned, &mut cited_errors);
+        assert_eq!(header_violations, []);
+        assert_eq!(
+            check_error_docs_cited(&temp, &cited_errors),
+            [],
+            "an error page is cited by the test expectation, not by its SPEC rule"
+        );
         fs::remove_dir_all(&temp).unwrap_or_default();
     }
 

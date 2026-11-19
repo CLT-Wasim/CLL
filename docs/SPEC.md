@@ -33,9 +33,10 @@ document is wrong; file an issue against the spec, do not "interpret".
 
 **R-LEX-002** Line endings are `\n`. A lone `\r` is an error `E0001`, not whitespace.
 
-**R-LEX-003** A comment starts with `#` and runs to end of line. `///` starts a
-documentation comment attached to the next item. Block comments do not exist.
-*Why:* DECISIONS [22]; nested block comments are a lexer bug farm.
+**R-LEX-003** An ordinary comment starts with `#` and runs to end of line. A documentation
+comment starts with `///` and is attached to the next module item; the lexer recognizes it
+before ordinary comments. Block comments do not exist. *Why:* DECISIONS [22]; nested block
+comments are a lexer bug farm.
 
 **R-LEX-004** Identifiers match `[A-Za-z_][A-Za-z0-9_]*` and are ASCII only. A non-ASCII
 identifier is `E0002`. *Why:* non-ASCII identifiers invite homoglyph attacks in code that
@@ -48,9 +49,11 @@ octal `0o17`. A leading zero followed by a digit (`0123`) is `E0003`.
 **R-LEX-006** Float literals always contain `.` or an exponent: `1.0`, `1e9`, `2.5e-3`.
 `1.` and `.5` are `E0004`; write `1.0` and `0.5`. *Why:* one spelling per value.
 
-**R-LEX-007** Numeric suffixes are exactly `u8 u16 u32 u64 u128 i8 i16 i32 i64 i128 usize
-f16 bf16 f32 f64`. An unknown suffix is `E0005`. A suffix that cannot hold the literal is
-`E0006`, detected at lexing, not at run time.
+**R-LEX-007** Integer suffixes are exactly `u8 u16 u32 u64 u128 i8 i16 i32 i64 i128 usize`;
+float suffixes are exactly `f16 bf16 f32 f64`. A suffix from the wrong set, or any unknown
+suffix immediately following a numeric literal, is `E0005`. A valid integer suffix that
+cannot hold the literal is `E0006`, detected at lexing, not at run time. The lexer consumes
+the complete adjacent identifier-like suffix before deciding whether it is valid.
 
 **R-LEX-008** String literals are double-quoted UTF-8 with escapes `\n \t \r \\ \" \{ \}`
 and `\u{...}`. Any other escape is `E0007`. An unterminated literal is `E0008`.
@@ -68,9 +71,10 @@ adding them later is not a breaking change.
 
 **R-LEX-011** Punctuation: `+ - * / % ^ & | ~ ! = == != < <= > >= << >> && || += -= *= /=
 %= ^= &= |= <<= >>= +%= -%= *%= +| -| *| -> => :: : ; , . .. ( ) [ ] { } #@`.
-`+%=`, `-%=`, `*%=` are the wrapping compound assignments (R-EXP-021).
-`+|`, `-|`, `*|` are the saturating ones (R-EXP-022). Maximal munch applies; `a +%= b` is
-one token sequence, `a +% = b` is `E0009`.
+`+%=`, `-%=`, `*%=` are single wrapping compound-assignment tokens (R-EXP-021). `+|`,
+`-|`, `*|` are saturating expression operators (R-EXP-022); saturating compound assignments
+do not exist in v1—write an ordinary assignment with a saturating expression instead.
+Maximal munch applies; `a +%= b` is one token sequence, while `a +% = b` is `E0009`.
 
 **R-LEX-012** A `#@` line at the top of a file is a test directive and is only meaningful
 in `tests/`. In a non-test file it is `E0010`. *Why:* the directive header must never leak
@@ -120,8 +124,10 @@ other than abort (R-RUN-020).
 comparison with a non-secret, use as a branch condition, use as an array index, and use as
 a loop bound (R-CAP-040). *Why:* DECISIONS [72].
 
-**R-TYP-012** Generic parameters use `[...]`, declared as `fn f[T](x: T) -> T`. Angle
-brackets are never used for generics (DECISIONS [12]).
+**R-TYP-012** Generic parameters and arguments use square brackets, never angle brackets
+(DECISIONS [12]). A type parameter may have one or more compiler/standard-library trait
+bounds; a constant parameter is declared with `const`. The exact forms and argument-kind
+checking are specified in R-TYP-033..034.
 
 **R-TYP-013** No implicit conversions exist between any two types, including
 `i32` → `i64`, `u8` → `usize`, and integer → float. Every conversion is written `as`.
@@ -145,6 +151,18 @@ required (R-TYP-031).
 **R-TYP-032** A shape mismatch in `matmul`, `+`, `-`, `*`, reshape, or any other
 shape-consuming operation is a **compile error** `E0021`, never a runtime check and never
 a silently broadcast shape. Broadcasting does not exist in v1.
+
+**R-TYP-033** A type parameter is written `T` or `T: Trait + OtherTrait` in a generic
+parameter list. Bounds name compiler- or standard-library-provided traits. User-defined
+trait and implementation declarations, trait objects, and dynamic dispatch are not v1
+features; `impl` remains reserved. Bounds are checked statically after monomorphization.
+
+**R-TYP-034** A constant generic parameter is written `const N: usize` (or another
+unsigned integer type). A generic application supplies type arguments or constant
+expressions in the declared parameter order. The declaration determines each argument's
+kind; a kind mismatch is a compile error. `Tensor` takes one element type followed by one
+or more constant dimensions (R-TYP-030). `Option[T]`, `Result[T, E]`, `Box[T]`, and `Vec[T]`
+take type arguments only.
 
 ---
 
@@ -223,9 +241,17 @@ affine and one-way, so passing it through a reversible function would destroy it
 **R-EXP-001** Every block is an expression. The value of a block is the value of its last
 expression, or `()` if the last item is a statement ending in `;`.
 
-**R-EXP-010** Operators and precedence, tightest first:
-`! ~ -` (unary), `as as_wrapping`, `* / %`, `+ -`, `<< >>`, `&`, `^`, `|`,
-`== != < <= > >=`, `&&`, `||`, `= += -= *= /= %= ^= &= |= <<= >>= +%= -%= *%= +| -| *|`.
+**R-EXP-002** An ordinary `if` expression requires `else`; each branch is a block and both
+blocks must have the same type. A `match` is an expression and every arm must have the same
+type. A `for` loop is a unit-valued expression. Assignment, declaration, `return`, `break`,
+`continue`, reversible primitives, and reversible `if` are statements, not value
+expressions.
+
+**R-EXP-010** Expression operators and precedence, tightest first:
+`! ~ -` (unary), `as as_wrapping`, `* / % *% *|`, `+ - +% -% +| -|`, `<< >>`, `&`, `^`, `|`,
+`== != < <= > >=`, `&&`, `||`. Assignment operators are statement syntax, not expression
+operators; saturating compound assignments do not exist in v1. Wrapping compound forms are
+`+%= -%= *%=`.
 
 **R-EXP-011** Bitwise operators bind **tighter than** comparison. `a & b == c` parses as
 `(a & b) == c`. *Why:* DECISIONS [13]; fixes C's most-reported precedence trap.
@@ -287,6 +313,13 @@ evaluated once. A half-open range is the only form; `a..=b` does not exist.
 **R-EXP-080** `discard(x)` is the only way to drop a value early. It carries `erase`
 (R-EFF-011).
 
+**R-EXP-090** `comptime { ... }` is a compile-time expression whose value is evaluated
+before code generation. It may use only compile-time values and deterministic pure
+computation; it may not use capabilities, `inout`, `unsafe`, I/O, or nondeterminism. Each
+evaluation has the fuel limit in DECISIONS [36]; exceeding the limit or depending on a
+runtime-only value is compile error `E0011`. A successful evaluation is guaranteed to
+terminate within that fuel budget.
+
 ---
 
 ## 6. Effects
@@ -347,9 +380,9 @@ untrusted input. *Why:* DECISIONS [125]; the root bundle must be handed out deli
 
 **R-CAP-020** A `rev fn` may not take or return any capability type (R-FN-011).
 
-**R-CAP-030** `unsafe` blocks require `#[justify("...")]` with a non-empty reason
-(DECISIONS [74]); a missing or empty justification is `E0132`. `cll audit` lists every
-`unsafe` block, `Ffi` use, and capability use per package.
+**R-CAP-030** An unsafe block is written `#[justify("reason")] unsafe { ... }`; the
+non-empty justification must immediately precede that block. A missing or empty reason is
+`E0132`. `cll audit` lists every `unsafe` block, `Ffi` use, and capability use per package.
 
 **R-CAP-040** `secret[T]`: see R-TYP-011. Branching on a secret, indexing with a secret,
 printing a secret, or comparing a secret with `==` is `E0133`.
@@ -591,6 +624,7 @@ Codes are permanent and never reused (DECISIONS [141]). Each has a page in
 | E0008 | unterminated string literal |
 | E0009 | malformed compound assignment |
 | E0010 | test directive in a non-test file |
+| E0011 | compile-time evaluation depends on runtime data or exceeds its fuel budget |
 | E0020 | non-evaluable const-generic dimension |
 | E0021 | tensor shape mismatch |
 | E0030 | assignment to immutable binding |
@@ -635,6 +669,9 @@ Codes are permanent and never reused (DECISIONS [141]). Each has a page in
 
 ## 12. Change log
 
-**v0.1** — first draft. Introduces rule IDs, the closed primitive table, and the six
-resolutions marked *spec gap G1..G6*, which are listed as new decisions [149]..[154] in
-`DECISIONS.md`. Awaiting owner sign-off (ROADMAP M1 exit criterion).
+**v0.1** — initial draft. Introduces rule IDs, the closed primitive table, and six
+resolutions listed as decisions [149]..[154] in `DECISIONS.md`.
+
+**v0.2-draft** — expands generic/const-generic rules, defines `comptime` and unsafe-block
+syntax, clarifies lexical and assignment tokenization, and aligns expression semantics with
+the surface grammar. This is a review proposal; ROADMAP M1 owner sign-off remains required.

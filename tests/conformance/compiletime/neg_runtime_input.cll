@@ -1,0 +1,7 @@
+#@ rule: R-EXP-090
+#@ expect: compile-error E0011
+# A comptime expression cannot depend on a run-time parameter.
+
+fn bad(value: u32) -> u32 {
+    comptime { value }
+}
