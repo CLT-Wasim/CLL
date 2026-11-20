@@ -24,5 +24,7 @@
 #![forbid(unsafe_code)]
 
 pub mod conformance;
+pub mod interpreter;
 pub mod lexer;
+pub mod parser;
 pub mod revtable;
