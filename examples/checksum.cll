@@ -1,0 +1,8 @@
+# A deterministic 32-bit mixing checksum. The multiplication is explicitly modulo 2^32.
+pure fn checksum(word: u32, key: u32) -> u32 {
+    (word ^ key) *% 2654435761u32
+}
+
+fn main() -> u32 {
+    checksum(0x12345678u32, 0x9abcdef0u32)
+}
